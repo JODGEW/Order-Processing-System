@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order Processing System</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2e3345;
+    --text: #e1e4ed;
+    --text-dim: #8b90a0;
+    --accent: #6c8aff;
+    --accent-hover: #8ba3ff;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --orange: #fb923c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* --- Layout --- */
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .live-badge {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  /* --- Card --- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  /* --- Form --- */
+  label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    margin-bottom: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus { border-color: var(--accent); }
+
+  .item-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 80px 28px;
+    gap: 6px;
+    align-items: end;
+    margin-bottom: 6px;
+  }
+
+  .item-row input { margin-bottom: 0; }
+
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    width: 100%;
+    padding: 10px;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-small {
+    background: var(--surface2);
+    color: var(--text-dim);
+    padding: 4px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+  }
+
+  .btn-small:hover { color: var(--text); border-color: var(--text-dim); }
+
+  .btn-remove {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--red);
+    width: 28px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .btn-remove:hover { background: rgba(248, 113, 113, 0.1); }
+
+  .add-item-row {
+    margin-top: 4px;
+    margin-bottom: 8px;
+  }
+
+  /* --- Alerts --- */
+  .alert {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  .alert-error {
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    color: var(--red);
+  }
+
+  .alert-success {
+    background: rgba(52, 211, 153, 0.1);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+    color: var(--green);
+  }
+
+  /* --- Orders Table --- */
+  .orders-list { margin-top: 4px; }
+
+  .order-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 90px 60px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 13px;
+  }
+
+  .order-row:hover { background: var(--surface2); }
+  .order-row.active { background: var(--surface2); border: 1px solid var(--accent); }
+
+  .order-row-header {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: default;
+    padding: 6px 12px;
+  }
+
+  .order-row-header:hover { background: transparent; }
+
+  .order-id {
+    font-size: 12px;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .order-total { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* --- Badges --- */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .badge-pending { background: rgba(251, 191, 36, 0.15); color: var(--yellow); }
+  .badge-paid { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+  .badge-payment_failed { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+  .badge-cancelled { background: rgba(139, 144, 160, 0.15); color: var(--text-dim); }
+
+  /* --- Detail Panel --- */
+  .detail-section { margin-bottom: 16px; }
+
+  .detail-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .detail-value {
+    font-size: 13px;
+    word-break: break-all;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .items-table {
+    width: 100%;
+    font-size: 12px;
+    border-collapse: collapse;
+    margin-top: 6px;
+  }
+
+  .items-table th {
+    text-align: left;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .items-table td {
+    padding: 8px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .items-table tr:last-child td { border-bottom: none; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  .empty-state .icon { font-size: 28px; margin-bottom: 8px; }
+
+  /* --- Refresh --- */
+  .refresh-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .auto-refresh {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .auto-refresh input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span>//</span> order_processing_system</h1>
+    <div class="live-badge"><div class="status-dot"></div>connected</div>
+  </header>
+
+  <div class="grid">
+    <!-- Left: Create Order Form -->
+    <div>
+      <div class="card">
+        <div class="card-title">Create Order</div>
+
+        <label>User ID</label>
+        <input type="text" id="userId" placeholder="user-1" value="user-1">
+
+        <label>Idempotency Key <span style="color:var(--text-dim)">(optional)</span></label>
+        <input type="text" id="idempotencyKey" placeholder="auto-generated if empty">
+
+        <label>Items</label>
+        <div id="itemsContainer">
+          <div class="item-row">
+            <input type="text" placeholder="Product" value="Widget" class="item-name">
+            <input type="number" placeholder="Qty" value="2" min="1" class="item-qty">
+            <input type="number" placeholder="Price" value="14.99" min="0" step="0.01" class="item-price">
+            <button class="btn-remove" onclick="removeItem(this)" title="Remove">&times;</button>
+          </div>
+        </div>
+        <div class="add-item-row">
+          <button class="btn btn-small" onclick="addItem()">+ Add Item</button>
+        </div>
+
+        <button class="btn btn-primary" id="submitBtn" onclick="createOrder()">Submit Order</button>
+        <div id="formAlert"></div>
+      </div>
+    </div>
+
+    <!-- Right: Orders List + Detail -->
+    <div>
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="refresh-bar">
+          <div class="card-title" style="margin-bottom:0">Orders</div>
+          <div class="auto-refresh">
+            <input type="checkbox" id="autoRefresh" checked>
+            <label for="autoRefresh" style="margin:0;text-transform:none;font-size:11px;letter-spacing:0">Auto-refresh (3s)</label>
+            <button class="btn btn-small" onclick="loadOrders()">Refresh</button>
+          </div>
+        </div>
+
+        <div class="order-row order-row-header">
+          <span>Order ID</span>
+          <span>Status</span>
+          <span>User</span>
+          <span style="text-align:right">Total</span>
+        </div>
+        <div class="orders-list" id="ordersList">
+          <div class="empty-state">
+            <div class="icon">~</div>
+            <div>No orders yet</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="detailCard" style="display:none;">
+        <div class="card-title">Order Detail</div>
+        <div id="detailContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let selectedOrderId = null;
+let refreshInterval = null;
+
+// --- Items ---
+function addItem() {
+  const row = document.createElement('div');
+  row.className = 'item-row';
+  row.innerHTML = `
+    <input type="text" placeholder="Product" class="item-name">
+    <input type="number" placeholder="Qty" value="1" min="1" class="item-qty">
+    <input type="number" placeholder="Price" min="0" step="0.01" class="item-price">
+    <button class="btn-remove" onclick="removeItem(this)" title="Remove">&times;</button>
+  `;
+  document.getElementById('itemsContainer').appendChild(row);
+}
+
+function removeItem(btn) {
+  const container = document.getElementById('itemsContainer');
+  if (container.children.length > 1) {
+    btn.closest('.item-row').remove();
+  }
+}
+
+function getItems() {
+  const rows = document.querySelectorAll('.item-row');
+  return Array.from(rows).map(row => ({
+    productName: row.querySelector('.item-name').value.trim(),
+    quantity: parseInt(row.querySelector('.item-qty').value) || 0,
+    unitPrice: parseFloat(row.querySelector('.item-price').value) || 0
+  })).filter(i => i.productName);
+}
+
+// --- Create Order ---
+async function createOrder() {
+  const btn = document.getElementById('submitBtn');
+  const alert = document.getElementById('formAlert');
+  alert.innerHTML = '';
+
+  const userId = document.getElementById('userId').value.trim();
+  const idempotencyKey = document.getElementById('idempotencyKey').value.trim();
+  const items = getItems();
+
+  const body = { userId, items };
+  if (idempotencyKey) body.idempotencyKey = idempotencyKey;
+
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  try {
+    const res = await fetch(API + '/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const errors = data.errors ? data.errors.join('<br>') : (data.error || 'Unknown error');
+      alert.innerHTML = `<div class="alert alert-error">${errors}</div>`;
+      return;
+    }
+
+    alert.innerHTML = `<div class="alert alert-success">Order created: ${data.orderId.substring(0, 8)}... (${data.status})</div>`;
+    loadOrders();
+    selectOrder(data.orderId);
+  } catch (e) {
+    alert.innerHTML = `<div class="alert alert-error">Connection failed: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Order';
+  }
+}
+
+// --- Load Orders ---
+async function loadOrders() {
+  try {
+    const res = await fetch(API + '/orders');
+    const orders = await res.json();
+    renderOrders(orders);
+    // Update connection status
+    document.querySelector('.live-badge').innerHTML = '<div class="status-dot"></div>connected';
+  } catch (e) {
+    document.querySelector('.live-badge').innerHTML = '<div class="status-dot" style="background:var(--red)"></div>disconnected';
+  }
+}
+
+function renderOrders(orders) {
+  const list = document.getElementById('ordersList');
+
+  if (orders.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">~</div><div>No orders yet</div></div>';
+    return;
+  }
+
+  // Newest first
+  orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  list.innerHTML = orders.map(o => `
+    <div class="order-row ${o.orderId === selectedOrderId ? 'active' : ''}"
+         onclick="selectOrder('${o.orderId}')">
+      <span class="order-id">${o.orderId.substring(0, 8)}...</span>
+      <span><span class="badge badge-${o.status.toLowerCase()}">${o.status}</span></span>
+      <span style="color:var(--text-dim)">${o.userId}</span>
+      <span class="order-total">$${o.totalPrice.toFixed(2)}</span>
+    </div>
+  `).join('');
+}
+
+// --- Select & Detail ---
+async function selectOrder(id) {
+  // Toggle: clicking the same order again collapses the detail panel
+  if (selectedOrderId === id && document.getElementById('detailCard').style.display !== 'none') {
+    selectedOrderId = null;
+    document.getElementById('detailCard').style.display = 'none';
+    document.querySelectorAll('.order-row:not(.order-row-header)').forEach(r => r.classList.remove('active'));
+    return;
+  }
+
+  selectedOrderId = id;
+
+  // Re-highlight in list
+  document.querySelectorAll('.order-row:not(.order-row-header)').forEach(r => {
+    r.classList.toggle('active', r.onclick?.toString().includes(id));
+  });
+
+  try {
+    const res = await fetch(API + `/orders/${id}`);
+    const order = await res.json();
+    renderDetail(order);
+  } catch (e) {
+    document.getElementById('detailContent').innerHTML = `<div class="alert alert-error">Failed to load order</div>`;
+  }
+
+  document.getElementById('detailCard').style.display = 'block';
+}
+
+// Refresh detail without toggling — used by auto-refresh only
+async function refreshDetail(id) {
+  try {
+    const res = await fetch(API + `/orders/${id}`);
+    const order = await res.json();
+    renderDetail(order);
+  } catch (e) { /* silently skip on refresh failure */ }
+}
+
+function renderDetail(o) {
+  const itemsHtml = o.items.map(i => `
+    <tr>
+      <td>${i.productName}</td>
+      <td>${i.quantity}</td>
+      <td>$${i.unitPrice.toFixed(2)}</td>
+      <td style="text-align:right">$${(i.quantity * i.unitPrice).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-section">
+        <div class="detail-label">Order ID</div>
+        <div class="detail-value">${o.orderId}</div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">Status</div>
+        <div class="detail-value"><span class="badge badge-${o.status.toLowerCase()}">${o.status}</span></div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">User ID</div>
+        <div class="detail-value">${o.userId}</div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">Total</div>
+        <div class="detail-value">$${o.totalPrice.toFixed(2)}</div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">Created</div>
+        <div class="detail-value">${new Date(o.createdAt).toLocaleString()}</div>
+      </div>
+    </div>
+
+    <div class="detail-section" style="margin-top: 8px;">
+      <div class="detail-label">Items</div>
+      <table class="items-table">
+        <thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th style="text-align:right">Subtotal</th></tr></thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// --- Auto-refresh ---
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshInterval = setInterval(() => {
+    if (document.getElementById('autoRefresh').checked) {
+      loadOrders();
+      if (selectedOrderId && document.getElementById('detailCard').style.display !== 'none') {
+        refreshDetail(selectedOrderId);
+      }
+    }
+  }, 3000);
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+}
+
+// --- Init ---
+loadOrders();
+startAutoRefresh();
+</script>
+</body>
+</html>
