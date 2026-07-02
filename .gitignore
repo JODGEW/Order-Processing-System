@@ -35,3 +35,6 @@ build/
 
 ### Mac ###
 .DS_Store
+
+.env
+k8s/base/app-config.yaml

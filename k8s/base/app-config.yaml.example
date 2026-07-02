@@ -1,0 +1,24 @@
+# ==========================================================
+# Template for Kubernetes Configurations
+# Copy this file to 'app-config.yaml' and update with your real values.
+# ==========================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-app-config
+data:
+  db-url: "jdbc:postgresql://postgres:5432/YOUR_DB_NAME"
+  kafka-brokers: "kafka:9092"
+  db-name: "YOUR_DB_NAME"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: order-app-secret
+type: Opaque
+stringData:
+  # Base64 encoding is not required here if using stringData
+  db-username: "YOUR_USERNAME"
+  db-password: "YOUR_PASSWORD"
