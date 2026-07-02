@@ -39,7 +39,8 @@ An event-driven order processing backend built with Spring Boot, PostgreSQL, and
 | Database         | PostgreSQL 16               |
 | Messaging        | Apache Kafka (KRaft)        |
 | ORM              | Spring Data JPA / Hibernate |
-| Containerization | Docker & Docker Compose     |
+| Containerization | Docker, Docker Compose      |
+| Orchestration    | Kubernetes                  |
 | Build            | Maven                       |
 
 ## Getting Started
@@ -48,23 +49,89 @@ An event-driven order processing backend built with Spring Boot, PostgreSQL, and
 
 - Java 17+
 - Docker & Docker Compose
+- kubectl
+- A local Kubernetes cluster (Docker Desktop Kubernetes, Minikube, kind, etc.)
 
-### Run the full stack
+### Run the full stack on Kubernetes
 
 ```bash
 ./mvnw clean package -DskipTests
-docker compose up --build
+docker build -t order_processing_system-app:latest .
+```
+
+If your Kubernetes cluster does not use the same Docker image store as your shell, load the image into the cluster:
+
+```bash
+# Minikube option 1: build directly into Minikube's Docker daemon
+eval $(minikube docker-env)
+docker build -t order_processing_system-app:latest .
+
+# Minikube option 2: load an already-built local image
+minikube image load order_processing_system-app:latest
+
+# kind
+kind load docker-image order_processing_system-app:latest
+```
+
+Create your local Kubernetes config from the example and set local-only values:
+
+```bash
+cp k8s/base/app-config.yaml.example k8s/base/app-config.yaml
+```
+
+The service names below match `k8s/base/order-system.yaml`; replace the database name and credentials with your own local values:
+
+```yaml
+db-url: "jdbc:postgresql://postgres:5432/<DB_NAME>"
+kafka-brokers: "kafka:9092"
+db-name: "<DB_NAME>"
+db-username: "<DB_USERNAME>"
+db-password: "<DB_PASSWORD>"
+```
+
+`k8s/base/app-config.yaml` is gitignored so local secrets are not committed.
+
+Deploy the stack:
+
+```bash
+kubectl apply -f k8s/base/app-config.yaml
+kubectl apply -f k8s/base/order-system.yaml
+kubectl get pods
+```
+
+Expose the app locally:
+
+```bash
+kubectl port-forward svc/order-app-service 8080:8080
 ```
 
 The dashboard is available at **http://localhost:8080/** -- a single-page UI for creating orders, viewing status transitions, and inspecting order details.
 
 ### Development mode
 
-Run Postgres and Kafka in Docker, the app locally:
+Create local Docker Compose environment values:
 
 ```bash
-docker compose up postgres kafka
+cp .env.example .env
+```
+
+Edit `.env` and replace the placeholder username/password with local-only values. `.env` is gitignored; keep only `.env.example` in git.
+
+Run Postgres and Kafka in Docker, then run the app locally:
+
+```bash
+docker compose up -d postgres kafka
+set -a
+source .env
+set +a
 ./mvnw spring-boot:run
+```
+
+You can also run the full stack with Docker Compose instead of Kubernetes:
+
+```bash
+./mvnw clean package -DskipTests
+docker compose up --build
 ```
 
 ## Dashboard
@@ -72,7 +139,7 @@ docker compose up postgres kafka
 A vanilla HTML/CSS/JS frontend served at the root path (`/`) -- no build tools or frameworks.
 
 - Create orders with dynamic item rows
-- Auto-refreshing order list with color-coded status badges (green = PAID, yellow = PENDING, red = FAILED)
+- Auto-refreshing order list with color-coded status badges (green = PAID, yellow = PENDING, red = PAYMENT_FAILED)
 - Click any order to see item breakdown and timestamps
 - Connection status indicator
 

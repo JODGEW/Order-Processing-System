@@ -8,9 +8,9 @@ kind: ConfigMap
 metadata:
   name: order-app-config
 data:
-  db-url: "jdbc:postgresql://postgres:5432/YOUR_DB_NAME"
+  db-url: "jdbc:postgresql://postgres:5432/<DB_NAME>"
   kafka-brokers: "kafka:9092"
-  db-name: "YOUR_DB_NAME"
+  db-name: "<DB_NAME>"
 
 ---
 apiVersion: v1
@@ -20,5 +20,5 @@ metadata:
 type: Opaque
 stringData:
   # Base64 encoding is not required here if using stringData
-  db-username: "YOUR_USERNAME"
-  db-password: "YOUR_PASSWORD"
+  db-username: "<DB_USERNAME>"
+  db-password: "<DB_PASSWORD>"
