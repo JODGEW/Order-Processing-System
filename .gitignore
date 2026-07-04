@@ -38,3 +38,6 @@ build/
 
 .env
 k8s/base/app-config.yaml
+
+### Daily reports (local only) ###
+docs/daily-reports/

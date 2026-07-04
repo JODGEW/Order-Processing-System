@@ -131,9 +131,22 @@ spec:
       containers:
       - name: order-app
         image: order_processing_system-app:latest
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
+        # --- Add Probe Configuration ---
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 80 # Wait to allow time for Java to start up
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 60 # Wait to confirm that the application initialization is complete
+          periodSeconds: 5
         env:
         - name: SPRING_DATASOURCE_URL
           valueFrom:
