@@ -2,14 +2,15 @@ package com.example.demo.service;
 
 import com.example.demo.event.OrderEvent;
 import com.example.demo.event.PaymentEvent;
+import com.example.demo.model.OutboxEvent;
 import com.example.demo.model.ProcessedEvent;
+import com.example.demo.repository.OutboxRepository;
 import com.example.demo.repository.ProcessedEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +18,7 @@ import java.util.Random;
 
 // Consumes ORDER_CREATED events from the "order-events" topic.
 // Simulates payment processing (80% success, 20% failure for demo purposes).
-// Publishes the result to "payment-events" topic.
+// Publishes the result to "payment-events" topic via the transactional outbox.
 //
 // groupId = "payment-group" means:
 //   - All instances of PaymentService share this consumer group
@@ -29,21 +30,22 @@ public class PaymentService {
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
     private static final String GROUP_ID = "payment-group";
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
     private final ProcessedEventRepository processedEventRepository;
     private final Random random = new Random();
 
-    public PaymentService(KafkaTemplate<String, String> kafkaTemplate,
+    public PaymentService(OutboxRepository outboxRepository,
                           ObjectMapper objectMapper,
                           ProcessedEventRepository processedEventRepository) {
-        this.kafkaTemplate = kafkaTemplate;
+        this.outboxRepository = outboxRepository;
         this.objectMapper = objectMapper;
         this.processedEventRepository = processedEventRepository;
     }
 
-    // @Transactional ensures the idempotency check + business logic + processed_events insert
-    // all happen in ONE database transaction. If any part fails, everything rolls back.
+    // @Transactional ensures the idempotency check + business logic + outbox insert
+    // + processed_events insert all happen in ONE database transaction.
+    // If any part fails, everything rolls back and nothing reaches Kafka.
     // The event will be redelivered by Kafka and retried cleanly.
     @KafkaListener(topics = "order-events", groupId = GROUP_ID)
     @Transactional
@@ -78,13 +80,22 @@ public class PaymentService {
                 log.warn("Payment FAILED for order={}", event.getOrderId());
             }
 
-            // Publish result to payment-events topic
-            kafkaTemplate.send("payment-events", event.getUserId(), toJson(result));
+            // --- Publish result via the outbox, NOT kafkaTemplate.send() ---
+            // Sending directly here would be a dual write: if the DB commit below failed
+            // after the send, Kafka would redeliver the order event and we would publish
+            // a second payment result (with a new eventId and possibly a different random
+            // outcome). Writing the result to the outbox in this same transaction means
+            // either everything commits or nothing is published.
+            OutboxEvent outbox = new OutboxEvent();
+            outbox.setAggregateId(event.getOrderId());
+            outbox.setEventType(result.getEventType());
+            outbox.setPartitionKey(event.getUserId());
+            outbox.setTopic("payment-events");
+            outbox.setPayload(toJson(result));
+            outboxRepository.save(outbox);
 
             // --- Record that we processed this event ---
             // This insert is part of the same @Transactional.
-            // If the business logic above succeeded but this insert fails → rollback all.
-            // Event gets redelivered → retried cleanly.
             processedEventRepository.save(new ProcessedEvent(event.getEventId(), GROUP_ID));
 
         } catch (JsonProcessingException e) {

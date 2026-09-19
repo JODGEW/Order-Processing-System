@@ -34,14 +34,9 @@ public class OrderController {
         return orderService.getAllOrders();
     }
 
-    // GET /orders/{id} → 200 OK or 404 Not Found
+    // GET /orders/{id} → 200 OK, or 404 via GlobalExceptionHandler (OrderNotFoundException)
     @GetMapping("/{id}")
-    public ResponseEntity<OrderResponse> getOrderById(@PathVariable UUID id) {
-        try {
-            OrderResponse response = orderService.getOrderById(id);
-            return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public OrderResponse getOrderById(@PathVariable UUID id) {
+        return orderService.getOrderById(id);
     }
 }

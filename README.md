@@ -26,7 +26,7 @@ An event-driven order processing backend built with Spring Boot, PostgreSQL, and
 ```
 
 - **Order Service** -- REST API, persists orders to Postgres, publishes `OrderCreated` events via a transactional outbox.
-- **Payment Service** -- Consumes `OrderCreated` events, simulates payment (80% success), publishes `PaymentCompleted` or `PaymentFailed`.
+- **Payment Service** -- Consumes `OrderCreated` events, simulates payment (80% success), publishes `PaymentCompleted` or `PaymentFailed` via the same transactional outbox.
 - **Notification Service** -- Consumes events from both topics, logs notifications (simulates email/SMS).
 - **OrderStatusUpdater** -- Consumes payment results and transitions order status via a state machine.
 
@@ -149,7 +149,7 @@ A vanilla HTML/CSS/JS frontend served at the root path (`/`) -- no build tools o
 |--------|----------------|--------------------|
 | POST   | `/orders`      | Create a new order |
 | GET    | `/orders`      | List all orders    |
-| GET    | `/orders/{id}` | Get order by ID    |
+| GET    | `/orders/{id}` | Get order by ID (404 if unknown) |
 
 ### Example requests
 
@@ -213,13 +213,13 @@ curl -s http://localhost:8080/orders/{id} | jq
 
 | Decision | Approach | Rationale |
 |----------|----------|-----------|
-| Event publishing | Transactional outbox | Order + event written in one DB transaction -- eliminates dual-write inconsistency |
+| Event publishing | Transactional outbox | Order + event (and payment result + processed-event marker) written in one DB transaction -- eliminates dual-write inconsistency. The relay waits for the broker acknowledgement before marking a row published |
 | Consumer idempotency | `processed_events` table | `(event_id, consumer_group)` unique constraint checked in the same transaction as business logic -- handles Kafka at-least-once redelivery |
 | Concurrency control | `@Version` optimistic locking | Prevents lost updates from concurrent consumers updating order status |
 | State transitions | Enum state machine | `OrderStatus.canTransitionTo()` rejects invalid transitions (e.g., `PAID -> PENDING`) at the domain level |
 | Partition key | `userId` | All events for a user land on the same partition -- guarantees per-user ordering |
 | Retry policy | `FixedBackOff` + Dead Letter Topic | 3 retries, 1s apart; poison messages routed to `<topic>.DLT`. Safe because consumers are idempotent |
-| HTTP idempotency | `idempotencyKey` unique constraint | Duplicate POST requests return the existing order instead of creating a new one |
+| HTTP idempotency | `idempotencyKey` unique constraint | Duplicate POST requests return the existing order instead of creating a new one, including when two requests with the same key race |
 
 ## Project Structure
 
@@ -230,7 +230,7 @@ src/main/java/com/example/demo/
 │   └── KafkaConfig.java              # Retry + DLT configuration
 ├── controller/
 │   ├── OrderController.java          # REST endpoints
-│   └── GlobalExceptionHandler.java   # Validation + state error handling
+│   └── GlobalExceptionHandler.java   # Validation, not-found + state error handling
 ├── dto/
 │   ├── OrderRequest.java             # Input with Bean Validation
 │   ├── OrderItemRequest.java
@@ -250,8 +250,9 @@ src/main/java/com/example/demo/
 │   └── ProcessedEventRepository.java
 └── service/
     ├── OrderService.java             # Core order logic + outbox write
+    ├── OrderNotFoundException.java   # Mapped to HTTP 404
     ├── OutboxPublisher.java          # Scheduled poller -> Kafka
-    ├── PaymentService.java           # Kafka consumer, simulates payment
+    ├── PaymentService.java           # Kafka consumer, simulates payment, outbox write
     ├── OrderStatusUpdater.java       # Payment result -> order status
     └── NotificationService.java      # Event logger
 ```
